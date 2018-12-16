@@ -48,7 +48,7 @@ std::vector<double> vector_alpha; // заполняются после explore
 int main()
 {
     std::srand(time(0));
-    std::ofstream outstream("output_last.txt");
+    std::ofstream outstream("output_sunday.txt");
     // 1) получение x
     vector_k = make_vector(0, K, 1);
     vector_x = make_vector_x(x_min, x_max, vector_k, K);
@@ -57,12 +57,15 @@ int main()
     // 3) зашумлённой f
     vector_f_tild = make_vector_f_tild(vector_x, a);
     // 4) проведение испытаний и получение новой f
-    explore(P, e, x_min, x_max, L);
+    explore(outstream, P, e, x_min, x_max, L);
     // 5) вывод
+    outstream << "clear function";
     print(outstream, vector_x, vector_f);
+    outstream << "noise function";
     print(outstream, vector_x, vector_f_tild);
+    outstream << "result function";
     print(outstream, vector_x, vector_f_result);
-    print(outstream, vector_alpha, vector_alpha);
+
     outstream.close();
     std::cin.get();
     return 0;
