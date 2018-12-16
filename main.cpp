@@ -15,11 +15,12 @@ std::vector<double> make_vector_x(double, double, std::vector<int> &, int);
 std::vector<double> make_vector_alpha(int, int);
 std::vector<double> make_vector_lyambda(std::vector<int> &, int);
 
-void explore(double, double, double, double, double);
+void explore(std::ofstream&, double, double, double, double, double);
 double func_expr(double);
 double harmonic_mean(std::vector<double> &, std::vector<double> &, int, int);
 double my_random(double, double);
 void print(std::ofstream&, const std::vector<double>&, const std::vector<double>&);
+void print_vector(std::ofstream&, const std::vector<double>&, std::string string = "");
 
 double e = 0.01;
 double x_min = 0;
@@ -119,28 +120,22 @@ std::vector<double> make_vector_x(double x_min, double x_max, std::vector<int> &
 }
 
 std::vector<double> make_vector_alpha(int r, int M) {
-    M -= 1;
-    r -= 1;
-    std::vector<double> alpha(r + 1);
-    alpha.at(M + 1) = my_random(0, 1);
-    alpha.at(M) = alpha.at(M + 2) = 0.5 * my_random(0, 1 - alpha.at(M + 1));
+    std::vector<double> alpha(r );
+    alpha.at(M ) = my_random(0, 1);
 
-    if (r < 4)
-        return alpha;
-
-    for (int m = 2; m < M + 1; ++m) {
+    for (int m = 1; m < M ; ++m) {
         double sum = 0;
-        for (int s = m + 1; s < r - m + 1; ++s) {
+        for (int s = m + 1; s < r - m - 1; ++s) {
             sum += alpha.at(s);
         }
-        alpha.at(m) = alpha.at(r - m + 1) = 0.5 * my_random(0, 1 - sum);
+        alpha.at(m) = alpha.at(r - m - 1) = 0.5 * my_random(0, 1 - sum);
     }
 
     double sum = 0;
-    for (int s = 2; s < r; ++s) {
+    for (int s = 1; s < r - 1; ++s) {
         sum += alpha.at(s);
     }
-    alpha.at(1) = alpha.at(r) = 0.5 * (1 - sum);
+    alpha.at(0) = alpha.at(r - 1) = 0.5 * (1 - sum);
     return alpha;
 }
 
@@ -152,7 +147,6 @@ std::vector<int> make_vector(int a, int b, int k) {
     return result;
 }
 
-////
 double dist(double w, double d) {
     return abs(w) + abs(d);
 }
@@ -181,25 +175,29 @@ double get_J(double & lyambda, double w, double d) {
     return (lyambda * w + (1 - lyambda) * d * 10000.f) / 10000.f; //round()
 }
 
-void explore(double P, double e, double a, double b, double L) {
+void explore(std::ofstream& outstream, double P, double e, double a, double b, double L) {
     // определение количества испытаний
     auto N = get_N(P, e, a, b);
     // создание вектора лямбда
     vector_lyambda = make_vector_lyambda(make_vector(0, L, 1), L);
+    print_vector(outstream, vector_lyambda, "lyambda:");
     // создание вектора альфа
     std::vector<std::vector<double>> alphas;
+    // создадим первый ыектор альфа
     int min_elem = 0; // в векторе лямбда
     int min_alphas = 0; // среди альфа
+    alphas.push_back(make_vector_alpha(r, M));
+    print_vector(outstream, alphas.at(0), "alpha:");
+    // min
+    auto vector_f_min = make_vector_f_result(vector_f_tild, alphas.at(min_alphas), K, M);
+    double w_min = get_w(vector_f_min, K);
+    double d_min = get_d(vector_f_min, vector_f_tild, K);
+    double min_result = get_J(vector_lyambda.at(min_elem), w_min, d_min);
 
     for (int i = 0; i < N; ++i) {
         //random vector_alpha
         alphas.push_back(make_vector_alpha(r, M));
-        // min
-        auto vector_f_min = make_vector_f_result(vector_f_tild, alphas.at(min_alphas), K, M);
-        double w_min = get_w(vector_f_min, K);
-        double d_min = get_d(vector_f_min, vector_f_tild, K);
-        double min_result = get_J(vector_lyambda.at(min_elem), w_min, d_min);
-        //
+        print_vector(outstream, alphas.at(alphas.size() - 1));
         auto vector_s_result = make_vector_f_result(vector_f_tild, alphas.at(alphas.size() - 1), K, M);
         double w = get_w(vector_s_result, K);
         double d = get_d(vector_s_result, vector_f_tild, K);
@@ -208,12 +206,21 @@ void explore(double P, double e, double a, double b, double L) {
             if (dist(get_J(vector_lyambda.at(j), w, d), 0) < dist(min_result, 0)) {
                 min_elem = j;
                 min_alphas = alphas.size() - 1;
+                min_result = get_J(vector_lyambda.at(j), w, d);
+                w_min = w;
+                d_min = d;
+                vector_f_min = vector_s_result;
             }
         }
     }
     vector_alpha = alphas.at(min_alphas);
     vector_f_result = make_vector_f_result(vector_f_tild, alphas.at(min_alphas), K, M);
     min_lyambda = min_elem;
+    outstream << "J: " << min_result
+              << "\nw: " << w_min
+              << "\nd: " << d_min
+              << "\nlyambda*: " << vector_lyambda.at(min_elem) << '\n';
+    print_vector(outstream, vector_alpha, "optimal vector alpha");
 }
 
 std::vector<double> make_vector_lyambda(std::vector<int> & l, int L) {
@@ -228,6 +235,14 @@ void print(std::ofstream& outstream, const std::vector<double>& vector_x, const 
     outstream << "\nprint...\n";
     for (auto i = 0; i < vector_x.size(); ++i) {
         outstream << '(' << vector_x.at(i) << ';' << vector_y.at(i) << ')';
+    }
+    outstream << std::endl;
+}
+
+void print_vector(std::ofstream& outstream, const std::vector<double>& vector, std::string string) {
+    outstream << string << std::endl;
+    for (auto i : vector) {
+        outstream << std::setw(7) << i << ';';
     }
     outstream << std::endl;
 }
